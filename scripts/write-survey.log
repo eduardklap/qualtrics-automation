@@ -1,0 +1,35 @@
+Attaching package: 'lubridate'
+
+The following objects are masked from 'package:base':
+
+    date, intersect, setdiff, union
+
+
+  |
+  |                                                                      |   0%
+  |
+  |======================================================================| 100%
+
+-- Column specification --------------------------------------------------------
+cols(
+  .default = col_logical(),
+  StartDate = col_datetime(format = ""),
+  EndDate = col_datetime(format = ""),
+  Status = col_character(),
+  IPAddress = col_character(),
+  Progress = col_double(),
+  `Duration (in seconds)` = col_double(),
+  RecordedDate = col_datetime(format = ""),
+  ResponseId = col_character(),
+  LocationLatitude = col_double(),
+  LocationLongitude = col_double(),
+  DistributionChannel = col_character(),
+  UserLanguage = col_character(),
+  Q1 = col_character()
+)
+i Use `spec()` for the full column specifications.
+
+'StartDate', 'EndDate', and 'RecordedDate' were converted without a specific timezone
+* To set a timezone, visit https://www.qualtrics.com/support/survey-platform/managing-your-account/
+* Timezone information is under 'User Settings'
+* See https://api.qualtrics.com/instructions/docs/Instructions/dates-and-times.md for more

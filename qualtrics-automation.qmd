@@ -1,0 +1,214 @@
+# Retrieve and save Qualtrics survey results in R
+
+## Retrieve Qualtrics data in R using the `qualtRics` package
+
+### Install `qualtRics` package
+
+First, within R install the `qualtRics` package from CRAN (if not yet installed):
+
+```{r}
+install.packages("qualtRics")
+```
+
+Next, load the `qualtRics` package:
+
+```{r}
+library(qualtRics)
+```
+
+### Register your Qualtrics credentials
+
+There are two important credentials you need to authenticate with the Qualtrics API. These are your **API key** and **datacenter-specific base URL**.
+
+You can find your API key in your Qualtrics Account settings: it is the long string of text under **Token** in the **API** box. The [Qualtrics API documentation](https://api.qualtrics.com/1aea264443797-base-url-and-datacenter-i-ds) explains how you can find your base URL: go to your Qualtrics Account settings and then in the **User** box, you can find your **datacenter ID**.
+
+The base URL you pass to the qualtRics package should look like `yourdatacenterid.qualtrics.com`, without a scheme such as `https://`.
+
+For my EUR account, the base URL is `fra1.qualtrics.com`. Note that at EUR, the API is not enabled by default for your account. You can request enabling of the API by sending an email to the [Erasmus Data Service Centre](https://www.eur.nl/en/library/erasmus-data-service-centre) at the Library. Please only request API enabling when planning to use it.
+
+Once your API is enabled and you have found your credentials, you can store your `QUALTRICS_API_KEY` and `QUALTRICS_BASE_URL` in your `.Renviron` file for repeated use across sessions. The qualtRics package has a function to help with this.
+
+```{r}
+library(qualtRics)
+
+qualtrics_api_credentials(api_key = "<YOUR-QUALTRICS_API_KEY>", 
+                          base_url = "<YOUR-QUALTRICS_BASE_URL>",
+                          install = TRUE,
+                          overwrite = TRUE)
+```
+
+After using this function, reload your environment `(readRenviron("~/.Renviron"))` so you can use the credentials without restarting R.
+
+```{r}
+(readRenviron("~/.Renviron"))
+```
+
+### Load Qualtrics data into R
+
+Once your Qualtrics API credentials are stored, you can see what surveys are available to you.
+
+```{r}
+surveys <- all_surveys() 
+# print the list to see which surveys are available for you
+print(surveys)
+```
+
+You can then download the data from any of these individual surveys (for example, perhaps the first one) directly into R. This will result in a tibble (i.e., a dataframe) with the results of the survey.
+
+```{r}
+mysurvey <- fetch_survey(surveyID = surveys$id[1], 
+                         verbose = TRUE)
+```
+
+#### Save the data
+
+You can use the tibble for further manipulation or data analysis within R or save it locally.
+
+```{r}
+mysurvey <- fetch_survey(surveyID = surveys$id[1], 
+                         save_dir = "~/Desktop/data", 
+                         verbose = TRUE)
+```
+
+Note that surveys that are stored in this way will be saved as an [RDS file](https://stat.ethz.ch/R-manual/R-devel/library/base/html/readRDS.html) rather than e.g. a CSV. If you prefer to save the data as CSV, do the following:
+
+```{r}
+mysurvey <- fetch_survey(surveyID = surveys$id[1], 
+                         verbose = TRUE)
+
+write.csv(mysurvey, "~/Desktop/data/survey-name-date.csv")
+```
+
+#### Using dates and times
+
+You can add date parameters to only retrieve responses between certain dates:
+
+```{r}
+mysurvey <- fetch_survey(surveys$id[1],
+                         start_date = "2023-10-01",
+                         end_date = "2023-10-31",
+                         label = FALSE)
+```
+
+Note that your date and time settings may not correspond to your own timezone. You can find out how to do this in the [Qualtrics user settings documentation](https://www.qualtrics.com/support/survey-platform/managing-your-account/research-core-account-settings/#user-settings). See [Dates and Times in the Qualtrics API documentation](https://api.qualtrics.com/7367ea545f562-dates-and-times) for more information about how Qualtrics handles dates and times. **Keep in mind that this is important if you plan on using times / dates as cut-off points to filter data.**
+
+## Schedule automatic downloads from Qualtrics surveys using `taskscheduleR` or `cronR` packages
+
+### Windows versus Mac
+
+How you need to schedule tasks depends on your operating system. If you are using Windows you should use the [taskscheduleR](https://github.com/bnosac/taskscheduleR) package, for Mac OS and Linux you should use the [cronR](https://github.com/bnosac/cronR) package. For now, I will continue the example with `cronR` for Mac, just because I am on a Mac operating system.
+
+#### Install `cronR` package
+
+First, within R install the `cronR` package from CRAN (if not yet installed):
+
+```{r}
+install.packages("cronR")
+```
+
+Next, load the `cronR` package:
+
+```{r}
+library(cronR)
+```
+
+### Schedule an example script
+
+First, to try out scheduling a job, we use a very simple R script called [write-date.R](scripts/write-date.R) in the `/scripts` folder of this repository. This script will save a simple .txt file with the following text: "Hello World at \[date & time\]". In this way you can test whether the scheduling worked as intended. NOTE: the only dependency that this scripts need is the `lubridate` package, you need to have it installed.
+
+I have scheduled the script to be executed daily at 13:52. I chose this time just because it was 13:50 when I was working on my script and I wanted to quickly see if it worked. You will get a prompt which asks you if you really want to add the specified job. If you choose yes, it will be scheduled.
+
+```{r}
+rscript <- cron_rscript("/Users/eduardklapwijk/qualtrics-test/scripts/write-date.R") 
+
+cron_add(rscript, "daily", at = "13:52",
+         tags = "write, date",
+         description = "write date in .txt file daily at 13:52")
+```
+
+This worked well. The script was executed automatically and in my `data` folder I now have a file [2024-01-05_T1352_data-set.txt](data/2024-01-05_T1352_data-set.txt) with the following content: "Hello World at 2024-01-05 13:52:01.124779". I am not interested in much more of these files, so in the next step I will clear this job:
+
+```{r}
+# clear all jobs
+cron_clear()
+```
+
+### Schedule automatic survey downloads
+
+Now that we got the example script running, we take it one step further and we are going to automatically execute an R script that uses the `qualtRics` package to download survey results. We are going to execute the [write-survey.R](scripts/write-survey.R) script. This will download the results from a very simple test survey with nonsense questions and responses from Qualtrics.
+
+```{r}
+rscript <- cron_rscript("/Users/eduardklapwijk/qualtrics-test/scripts/write-survey.R")
+cron_add(rscript, "daily", at = "14:28", days_of_week = 'Fri',
+         tags = "qualtrics, survey, download",
+         description = "download results from Qualtrics survey as .csv every Friday")
+```
+
+It has written the results in a .csv file to the `data` directory of this project ([2024-01-05_T1428_survey-name.csv](data/2024-01-05_T1428_survey-name.csv)). Again, the `lubridate` package is used to add time and date to the file name. Note, the file path should be explicitly stated in the R script, otherwise cron saves resulting files in the home directory.
+
+I am not interested in much more of these files, so in the next step I will again clear this job:
+
+```{r}
+# list all the jobs in your crontab
+cron_ls()
+
+# clear all jobs
+cron_clear()
+
+# clear a specific job
+cron_rm("448b6d2589cc499e4fe2de3ef1333b90")
+```
+
+### Some considerations for automatic scheduling
+
+#### Windows versus Mac
+
+The above examples are for Mac, using the `cronR` package. If you are on a Windows system, you should use the `taskscheduleR` package instead. I have not tested it, but it seems to work very similar with function `taskscheduler_create()` that resembles the `cron_add()` function used in this example.
+
+#### RStudio add-inn
+
+Both the `cronR` and the `taskscheduleR` package contain an RStudio addin. Using this addin you can interactively create a new job. Once you have `cronR` installed, just click Addins \> Schedule R scripts on Linux/Unix.
+
+#### System needs to be active
+
+Note that cron does not execute when your system is shut off or asleep. This means your system needs to be active in order to run the jobs. Of course, it is annoying that even though you have automated the process, you still have to make sure you manually turn on your computer or laptop at the right time. One solution will be to run the automatic job from a server (that is never asleep). For example, using a workspace in [SURF Research Cloud](https://servicedesk.surf.nl/wiki/display/WIKI/SURF+Research+Cloud).
+
+## Upload data to Yoda with curl
+
+In a final step, we want to upload the data to a [SURF Yoda](https://www.eur.nl/en/research/research-services/research-data-management/tooling/surf-yoda) workspace where we want to save our data.
+
+### Install `httr2` package
+
+First, within R install the `httr2` package from CRAN (if not yet installed):
+
+```{r}
+install.packages("httr2")
+```
+
+Next, load the `httr2` package:
+
+```{r}
+library(httr2)
+```
+
+### Send data to Yoda
+
+We want to send the .csv file in the `/data` directory that we retrieved from Qualtrics above ([2024-01-05_T1428_survey-name.csv](data/2024-01-05_T1428_survey-name.csv)) to our workspace on Yoda. For this example we are sending it to a (nonexistent) workspace in Yoda called "research-workspace-name". Note that you should change the url to an existing workspace name that you have access to, and change the username to your own username in the `req_auth_basic()` function. You will then be prompted to provide your [Yoda Data Access Password](https://www.eur.nl/en/research/research-services/research-data-management/tooling/surf-yoda/creating-data-access-password). If everything worked correctly, the file is now uploaded to your Yoda workspace.
+
+```{r}
+# first, provide the url of the Yoda workspace
+url <- "https://erasmus-data.irods.surfsara.nl/research-workspace-name/"
+# next, provide the path and filename of the file on your system
+file_path <- "data/"
+file_name <- "2024-01-05_T1428_survey-name.csv"
+
+# finally, we build the request and run req_perform() to perform it
+req <- request(url) |>
+  req_method("PUT") |>
+  req_body_file(path = paste0(file_path, file_name)) |>
+  req_url_path_append(file_name) |>
+  req_auth_basic(username = "yoda-user@eur.nl") |> # add your Yoda account here
+  req_perform()
+```
+
+Of course, this process could be automated as well. In that case, the code above should be added to the `write-survey.R` script, in which you have to add your password to the `req_auth_basic()` function (in that case you won't be prompted for the password).

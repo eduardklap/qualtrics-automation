@@ -1,0 +1,10 @@
+
+Attaching package: 'lubridate'
+
+The following objects are masked from 'package:base':
+
+    date, intersect, setdiff, union
+
+[1] "Hello World at 2024-01-05 13:52:01.124779"
+[1] "2024-01-05"
+NULL
