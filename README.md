@@ -1,6 +1,6 @@
 # Qualtrics automation
 
-Retrieve and save Qualtrics survey results in R
+Example scripts to retrieve and save Qualtrics survey results in R. Note that some comments about Qualtrics features and data uploads to Yoda storage are specific for researchers at [Erasmus University Rotterdam](https://www.eur.nl/), but most content might be useful for others working with Qualtrics and R as well.
 
 ## How to use the example script
 
